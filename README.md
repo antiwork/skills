@@ -13,7 +13,7 @@ _Everything but paying taxes._
 ![runtime](https://img.shields.io/badge/runtime-Hermes_Agent-db6d28)
 ![uptime](https://img.shields.io/badge/uptime-24%2F7-3fb950)
 
-**→ [View the interactive showcase](https://antiwork.github.io/skills/) ←**
+**→ [See the architecture](https://antiwork.com/skills) ←**
 
 </div>
 
