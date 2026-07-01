@@ -1,0 +1,46 @@
+# The Gumclaw redaction discipline, encoded.
+#
+# Nothing in these categories is ever committed to a public showcase. This file is part
+# of the showcase itself — it shows WHAT gets stripped, without leaking any of it.
+
+# secrets & credentials
+*.env
+.env*
+**/secrets/**
+**/*token*
+**/*apikey*
+**/*api_key*
+**/*credential*
+1password/
+op-*.json
+
+# customer & seller data
+**/tickets/**
+**/purchases/**
+**/*customer*
+**/*seller*
+**/*buyer*
+**/*.pii
+**/email-exports/**
+
+# production endpoints & console access
+**/prod_*.sh
+**/*bastion*
+**/*console*
+**/prod-endpoints*
+
+# chat destinations & routing
+**/chat_ids*
+**/deliver-targets*
+config.yaml          # real model routing / provider keys / approvals
+
+# live memory (the real brain's private state)
+memories/MEMORY.md
+memories/USER.md
+
+# runtime noise
+__pycache__/
+*.pyc
+*.log
+node_modules/
+.DS_Store

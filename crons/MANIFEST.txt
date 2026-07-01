@@ -1,0 +1,61 @@
+# Cron manifest — the 78 autonomous loops (redacted)
+#
+# This is a REDACTED representation of the scheduler. Delivery destinations (chat IDs),
+# exact prompts, model routing, and script internals are stripped. Cadence + purpose only.
+#
+# Legend:  [auto] fully autonomous   [gated] advances mechanical steps, human presses final button
+#          [wd] watchdog — silent unless broken
+
+# ── SUPPORT ──────────────────────────────────────────────────────────────────
+support-auto-triage              */15 * * * *   [auto]   read queue → investigate → reply/close/escalate
+helper-webhook-reconcile-sweep   every 20m      [auto]   at-least-once backstop for the live webhook
+deploy-gated-seller-close        every 20m      [gated]  ship fix → await prod deploy → close ticket
+closed-ticket-safety-net         0 11,23 * * *  [auto]   catch critical tickets auto-closed in error
+support-daily-briefing           0 9,15 * * *   [auto]   queue briefing for the operator
+stale-ticket-detector            hourly         [auto]   flag tickets sitting too long
+csat-dissatisfaction-notify      5 * * * *      [auto]   near-real-time unhappy-customer flag
+
+# ── RISK & FRAUD ─────────────────────────────────────────────────────────────
+hourly-risk-queue-review         0 * * * *      [auto]   rank sellers by exposure, suspend clear fraud
+autonomous-flag-review-payout    0 14 * * *     [auto]   flagged-fraud / sub-$100 / payout exceptions
+daily-card-testing-autorefund    0 15 * * *     [auto]   refund confirmed victims, keep bad-actor funds
+velocity-spike-scam-detector     0 */4 * * *    [auto]   clean-radar-on-brand-new-account backstop
+weekly-card-testing-detection    weekly         [auto]   high fail-ratio product scan
+weekly-refund-abuse-detection    weekly         [auto]   serial-refunder detection
+weekly-financial-fingerprint     weekly         [auto]   shared-payment-instrument rings
+daily-spam-detection             daily          [auto]   spam account + product scan
+risk-email-listener              every 15m      [auto]   monitor risk@ inbox, triage + act
+
+# ── FINANCE ──────────────────────────────────────────────────────────────────
+weekly-wip-close                 0 10 * * 1     [gated]  month-to-date revenue/COGS into QBO
+monthly-state-tax-je             monthly        [gated]  state sales-tax journal entries
+taxjar-upload-verifier           0 14 2-6 * *   [wd]     verify month's orders landed in TaxJar
+qbo-token-keepalive              0 9 * * *      [wd]     refresh QBO OAuth before it expires
+ramp-weekly-spend-digest         0 10 * * 1     [auto]   weekly card-spend digest for close
+monthly-connected-acct-balances  1 0 1 * *      [auto]   Stripe balance snapshot, all accounts
+daily-finance-dashboard          0 11 * * 1-5   [auto]   QBO-backed finance tiles
+
+# ── ENGINEERING ──────────────────────────────────────────────────────────────
+security-review                  0 10 * * *     [auto]   daily review of merged PRs
+flexile-ci-monitor               0 13 * * *     [auto]   CI failures on main → alert/fix
+pipeline-actor                   every 120m     [gated]  issue → fix → PR (green PRs go to a human)
+release-eng-issue-close-backstop every 60m      [auto]   close eng issues on matching prod release
+dashboards-refresh               */15 * * * *   [auto]   publish live ops dashboard + notable-change ping
+
+# ── WATCHDOGS (silent unless broken) ─────────────────────────────────────────
+telegram-pool-watchdog           every 2m       [wd]     gateway send-pool health, auto-restart
+sentry-proxy-watchdog            every 5m       [wd]     Sentry proxy liveness
+voice-bridge-watchdog            every 10m      [wd]     outbound voice-call chain keep-alive
+helper-webhook-proxy-watchdog    every 5m       [wd]     support webhook receiver liveness
+disk-janitor                     0 4 * * *      [wd]     reclaim caches / old build artifacts
+reclaim-memory                   every 30m      [wd]     free memory on the ops machine
+
+# ── REPORTS & CADENCE ────────────────────────────────────────────────────────
+weekly-performance-review        0 14 * * 1     [auto]   team throughput + OKR review
+weekly-team-briefing             0 9 * * 1      [auto]   Monday team briefing
+gumroad-monthly-update           0 10 1 * *     [auto]   investor/team monthly update
+planning-issue-meetings          0 17 * * 5     [auto]   schedule Monday planning block
+material-moves-watcher           0 */3 * * *    [auto]   surface only genuinely notable business moves
+
+# … ⟨redacted⟩ — 30+ additional loops (watchdogs, one-shots, reconciliation sweeps) omitted
+#     Delivery targets, prompts, and model routing removed for public showcase.
