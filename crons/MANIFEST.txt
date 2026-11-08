@@ -1,61 +1,162 @@
-# Cron manifest — the 78 autonomous loops (redacted)
+# Cron manifest — the standing autonomous loops (redacted, snapshot 2026-11-08)
 #
 # This is a REDACTED representation of the scheduler. Delivery destinations (chat IDs),
 # exact prompts, model routing, and script internals are stripped. Cadence + purpose only.
+# Loop names are generic; real names that carry a ticket, a seller or a date are renamed.
+#
+# 191 recurring loops are enabled; this file lists the 128 that are standing. The rest are
+# case-scoped follow-ups attached to one open ticket or PR and retire when it closes, so they
+# are omitted.
 #
 # Legend:  [auto] fully autonomous   [gated] advances mechanical steps, human presses final button
 #          [wd] watchdog — silent unless broken
+# Cadence: cron expression, or "every Nm" for a fixed interval.
 
 # ── SUPPORT ──────────────────────────────────────────────────────────────────
-support-auto-triage              */15 * * * *   [auto]   read queue → investigate → reply/close/escalate
-helper-webhook-reconcile-sweep   every 20m      [auto]   at-least-once backstop for the live webhook
-deploy-gated-seller-close        every 20m      [gated]  ship fix → await prod deploy → close ticket
-closed-ticket-safety-net         0 11,23 * * *  [auto]   catch critical tickets auto-closed in error
-support-daily-briefing           0 9,15 * * *   [auto]   queue briefing for the operator
-stale-ticket-detector            hourly         [auto]   flag tickets sitting too long
-csat-dissatisfaction-notify      5 * * * *      [auto]   near-real-time unhappy-customer flag
+gmail-ingest-poll-backstop         */5 * * * *      [auto]   poll backstop behind the Gmail push rail (at-least-once ingest)
+gmail-push-health                  7 * * * *        [wd]     push subscription alive, renewed before expiry
+gmail-push-cutover-monitor         17 * * * *       [wd]     no duplicate handling between push and poll paths
+gmail-per-requester-sweep          */15 * * * *     [auto]   per-requester open→done sweep, oldest first
+gmail-session-budget-guard         */2 * * * *      [wd]     kill a support session that overruns its token/time budget
+risk-queue-review (rolling)        every 30m        [auto]   read the queue → investigate → reply / close / escalate
+support-surge-watchdog             every 10m        [wd]     queue growth beyond the normal band
+support-followup-check             0 13 * * *       [auto]   every promise made in a reply gets kept or re-opened
+closed-ticket-safety-net           0 11,23 * * *    [auto]   catch critical tickets closed in error and re-open them
+csat                               5 * * * *        [auto]   hourly unhappy-customer scan, one consolidated report
+deploy-gated-seller-close          every 20m        [gated]  ship fix → await prod deploy → read back → close ticket
+seller-close-loop-critic           every 180m       [wd]     independent critic over the deploy-close loop
+resend-urgent-thread-watch         every 15m        [wd]     urgent thread with no reply after the SLA window
+monday-support-report              0 13 * * 1       [auto]   weekly support throughput report
+cli-feedback-triage                0 10 * * 1-5     [auto]   triage creator replies to the CLI feedback campaign
+local-deliver-guard                */5 * * * *      [wd]     watcher loops must not deliver into a human chat directly
 
 # ── RISK & FRAUD ─────────────────────────────────────────────────────────────
-hourly-risk-queue-review         0 * * * *      [auto]   rank sellers by exposure, suspend clear fraud
-autonomous-flag-review-payout    0 14 * * *     [auto]   flagged-fraud / sub-$100 / payout exceptions
-daily-card-testing-autorefund    0 15 * * *     [auto]   refund confirmed victims, keep bad-actor funds
-velocity-spike-scam-detector     0 */4 * * *    [auto]   clean-radar-on-brand-new-account backstop
-weekly-card-testing-detection    weekly         [auto]   high fail-ratio product scan
-weekly-refund-abuse-detection    weekly         [auto]   serial-refunder detection
-weekly-financial-fingerprint     weekly         [auto]   shared-payment-instrument rings
-daily-spam-detection             daily          [auto]   spam account + product scan
-risk-email-listener              every 15m      [auto]   monitor risk@ inbox, triage + act
+risk-queue-backlog-ping            30 * * * *       [wd]     SLA backstop for the rolling risk review
+risk-email-listener                13 */6 * * *     [auto]   risk group inbox: triage and act
+autonomous-flag-review-payout      0 14 * * *       [auto]   flagged-account review and payout exceptions
+card-testing-victim-gate           every 10m        [auto]   fast card-testing burst detector feeding the refund path
+card-testing-victim-autorefund     0 15 * * *       [auto]   refund confirmed victims, keep bad-actor funds
+daily-card-testing-detection       5 13 * * *       [auto]   high fail-ratio product scan
+daily-financial-fingerprint-scan   5 12 * * *       [auto]   shared-payment-instrument rings
+daily-refund-abuse-detection       5 14 * * *       [auto]   serial-refunder detection
+daily-spam-detection               55 14 * * *      [auto]   spam account and product scan
+chargeback-ring-scan-daily         30 9 * * *       [auto]   read-only chargeback ring signature scan
+chargeback-rate-tracker            0 11 * * 1       [auto]   weekly dispute-rate trend against processor thresholds
+weekly-invitation-ring-scan        35 13 * * 1      [auto]   invitation / referral abuse rings
+velocity-spike-scam-detector       0 */4 * * *      [auto]   clean-radar-on-brand-new-account backstop
+zero-deliverable-burst-scan        every 360m       [auto]   advance-fee / non-delivery sale schemes
+dead-card-checkout-detector        0 13 * * *       [wd]     silently failing card checkout path
+follow-form-harvest-detector       20 13 * * *      [wd]     follow-form abuse / address harvesting
+abandoned-cart-zero-send-watchdog  30 16 * * *      [wd]     abandoned-cart emails silently stopped sending
+stalled-payout-monitor             0 13 * * *       [auto]   payouts stuck past their expected window
+payout-batch-watchdog              0 14 * * 2-5     [wd]     same-day payout batch actually ran
+bank-link-watchdog                 0 12 * * *       [wd]     payout-skip signature from broken bank links
+escrow-release-condition-watch     0 9 * * 1        [gated]  suspended-seller escrow matures → release when conditions met
+negative-destination-topup-listen  every 30m        [auto]   negative connected-balance top-up alerts
+paypal-topup-alert-listener        every 15m        [auto]   processor top-up alert handling
+paypal-balance-recovery-check      every 480m       [wd]     processor balance health endpoint
 
-# ── FINANCE ──────────────────────────────────────────────────────────────────
-weekly-wip-close                 0 10 * * 1     [gated]  month-to-date revenue/COGS into QBO
-monthly-state-tax-je             monthly        [gated]  state sales-tax journal entries
-taxjar-upload-verifier           0 14 2-6 * *   [wd]     verify month's orders landed in TaxJar
-qbo-token-keepalive              0 9 * * *      [wd]     refresh QBO OAuth before it expires
-ramp-weekly-spend-digest         0 10 * * 1     [auto]   weekly card-spend digest for close
-monthly-connected-acct-balances  1 0 1 * *      [auto]   Stripe balance snapshot, all accounts
-daily-finance-dashboard          0 11 * * 1-5   [auto]   QBO-backed finance tiles
+# ── TRUST & SAFETY ───────────────────────────────────────────────────────────
+piracy-queue-hourly                0 * * * *        [auto]   piracy / DMCA adjudication queue
+ncmec-approval-watch               every 360m       [gated]  reporting-body correspondence; stop and escalate, never act alone
 
-# ── ENGINEERING ──────────────────────────────────────────────────────────────
-security-review                  0 10 * * *     [auto]   daily review of merged PRs
-flexile-ci-monitor               0 13 * * *     [auto]   CI failures on main → alert/fix
-pipeline-actor                   every 120m     [gated]  issue → fix → PR (green PRs go to a human)
-release-eng-issue-close-backstop every 60m      [auto]   close eng issues on matching prod release
-dashboards-refresh               */15 * * * *   [auto]   publish live ops dashboard + notable-change ping
+# ── FINANCE & ACCOUNTING ─────────────────────────────────────────────────────
+accounting-ledger-sync             0 13 * * *       [auto]   pull processor / bank / card feeds into the ledger
+accounting-daily-close             30 6 * * *       [auto]   daily double-entry close, balances must tie
+accounting-month-close             0 10 1 * *       [gated]  month-end close confirmation and journal entries
+monthly-close-watchdog             30 * * * *       [wd]     per-month success markers present
+mercury-ledger-reconcile           30 12 * * *      [wd]     bank settled transactions vs ledger postings
+mercury-beancount-tax-reconcile    0 12 * * *       [wd]     settled tax-authority charges vs ledger
+capital-orphan-check               0 13 * * *       [wd]     unapplied financing deductions
+daily-finance-dashboard            0 11 * * 1-5     [auto]   ledger-backed finance tiles
+gaap-review-monthly                0 14 5 * *       [auto]   monthly US GAAP compliance review
+gaap-review-quarterly              0 14 10 1,4,7,10 * [auto] quarterly US GAAP compliance review
+gaap-review-annual                 0 14 1 2 *       [auto]   annual US GAAP compliance review
+monthly-connected-balances-launch  1 0 1 * *        [auto]   start the detached connected-account balance pull
+monthly-connected-balances-deliver 0 2 1 * *        [auto]   deliver the pull once the gate confirms it finished
+monthly-platform-currency-balances 2 0 1 * *        [auto]   platform balance snapshot by currency
+accounting-email-listener          13 */6 * * *     [auto]   finance / accounting / tax mail on the shared inbox
+ramp-weekly-spend-digest           0 10 * * 1       [auto]   weekly card-spend digest for close
+vendor-bill-autopay                weekdays 9am     [gated]  release pre-approved vendor bills stuck at approval
+aws-billing-balance-watch          0 9 * * *        [wd]     cloud billing balance and payment-method health
+treasury-session-refresh           0 9 * * *        [wd]     self-service re-auth for the treasury rail
+monthly-update                     0 10 1 * *       [auto]   investor / team monthly update from ledger actuals
 
-# ── WATCHDOGS (silent unless broken) ─────────────────────────────────────────
-telegram-pool-watchdog           every 2m       [wd]     gateway send-pool health, auto-restart
-sentry-proxy-watchdog            every 5m       [wd]     Sentry proxy liveness
-voice-bridge-watchdog            every 10m      [wd]     outbound voice-call chain keep-alive
-helper-webhook-proxy-watchdog    every 5m       [wd]     support webhook receiver liveness
-disk-janitor                     0 4 * * *      [wd]     reclaim caches / old build artifacts
-reclaim-memory                   every 30m      [wd]     free memory on the ops machine
+# ── TAX ──────────────────────────────────────────────────────────────────────
+tax-deadline-check                 0 7 * * *        [wd]     upcoming filing and remittance deadlines
+taxjar-upload-verifier             0 14 2-6 * *     [wd]     month's orders landed in the sales-tax service
+tax-rail-topup                     0 */2 * * *      [gated]  keep the sales-tax / VAT remittance rail funded
+agency-notice-watch                0 9 * * *        [auto]   government / agency notices arriving by mail
 
-# ── REPORTS & CADENCE ────────────────────────────────────────────────────────
-weekly-performance-review        0 14 * * 1     [auto]   team throughput + OKR review
-weekly-team-briefing             0 9 * * 1      [auto]   Monday team briefing
-gumroad-monthly-update           0 10 1 * *     [auto]   investor/team monthly update
-planning-issue-meetings          0 17 * * 5     [auto]   schedule Monday planning block
-material-moves-watcher           0 */3 * * *    [auto]   surface only genuinely notable business moves
+# ── ENGINEERING & DEPLOYS ────────────────────────────────────────────────────
+security-review                    0 10 * * *       [auto]   daily security review of merged PRs
+github-queue-sweep                 every 60m        [auto]   the ONE GitHub sweep: open issues and PRs, review, move along
+github-inflight-mover              every 60m        [auto]   move in-flight agent work along (CI red, reviews, merges)
+github-staleness-sweep             every 240m       [auto]   time-shaped checks: `working` labels, stale drafts, janitor
+github-webhook-backstop            every 30m        [auto]   at-least-once drain behind the org webhook
+agent-work-checkpoint              */15 * * * *     [wd]     snapshot uncommitted work in every agent worktree
+deploy-approval-jam-watch          0 */2 * * *      [wd]     deploys stuck waiting on approval
+console-blocker-release-gate       every 30m        [wd]     fires when the production console accepts this host again
+prod-host-trust-autorefresh        every 30m        [wd]     keep production host trust current
+ptosc-leftover-watch               */20 * * * *     [wd]     leftover online-schema-change artifacts
+stripe-test-card-blocklist-wd      every 15m        [wd]     repair the shared test account's blocklist so CI checkout passes
+tail-latency-alarm-verify          30 9 * * *       [wd]     latency alarm wiring still valid
+disk-queue-alarm-verify            daily 9:30am     [wd]     queue-depth alarm wiring still valid
+flexile-ci-monitor                 0 13 * * *       [auto]   CI failures on main → alert / fix
+dashboards-refresh                 */15 * * * *     [auto]   publish the live ops dashboard
+dashboards-live-watchdog           every 30m        [wd]     dashboard site actually serving
+weekly-mobile-app-ship             5 10 * * 1       [auto]   weekly mobile app ship pipeline
+daily-mobile-release               0 5 * * *        [auto]   daily mobile release, autonomous
+mobile-live-notify                 0 6 * * *        [auto]   announce a release only once the store serves it
+android-qa-phone-health            every 30m        [wd]     QA phone attached and responsive
+tastelint-daily-outcome-learn      every 1440m      [auto]   style linter learns from review outcomes
+expensive-session-skill-review     every 720m       [auto]   review one expensive session so future runs waste less
+operator-feedback-skill-enhance    every 1440m      [auto]   fold operator review comments back into skills
+local-patch-reporter               every 60m        [auto]   report local un-upstreamed runtime patches
+local-patch-upstream-tracker       0 9 * * *        [auto]   has upstream absorbed a local patch yet
+local-patch-survival-watchdog      every 60m        [wd]     local runtime patches survive upgrades
+maxmind-geoip-weekly-refresh       0 14 * * 1       [auto]   refresh the geo database
+mcp-http-health-watchdog           every 15m        [wd]     inbound agent endpoint liveness
+long-worker-cohort-watchdog        */5 * * * *      [wd]     long-running worker cohort health
 
-# … ⟨redacted⟩ — 30+ additional loops (watchdogs, one-shots, reconciliation sweeps) omitted
+# ── GROWTH & MARKETING ───────────────────────────────────────────────────────
+auto-marketing-monitor             every 60m        [auto]   marketing automation monitor
+marketing-holdout-metrics-weekly   0 7,8 * * 1      [auto]   holdout vs treatment metrics, delivered verbatim
+mcp-growth-daily                   15 9 * * *       [auto]   daily API / MCP adoption report
+seo-weekly-playbook                0 14 * * 5       [auto]   weekly SEO run
+material-moves-watcher             0 */3 * * *      [auto]   surface only genuinely notable business moves
+firecrawl-credit-floor             0 */6 * * *      [wd]     crawl credits before they run out
+
+# ── INFRASTRUCTURE & SELF-PRESERVATION ───────────────────────────────────────
+deadman-heartbeat-ping             every 10m        [wd]     off-host dead-man's switch
+disk-headroom-guard                every 30m        [wd]     free space; protects every other job
+disk-janitor                       0 4 * * *        [wd]     reclaim caches and old build artifacts
+docker-daily-prune                 0 4 * * *        [wd]     prune container images and volumes
+tmp-worktree-sweep-nightly         0 * * * *        [wd]     stale git worktrees in temp
+mole-daily-clean                   30 4 * * *       [wd]     deep clean of the ops machine
+reclaim-memory                     every 30m        [wd]     free memory on the ops machine
+state-db-prune                     0 3,9,15,21 * * * [wd]    prune the runtime state database
+wal-checkpoint-watchdog            every 60m        [wd]     state DB write-ahead log checkpointed
+stale-session-auto-close           0 */2 * * *      [wd]     close idle sessions
+lane-janitor                       */20 * * * *     [wd]     orphaned worker lanes and sessions
+cron-delivery-ledger               every 15m        [wd]     every report that should have gone out, did
+cron-message-budget-watchdog       0 9 * * *        [wd]     daily cap on scheduler messages to humans
+cron-dep-canary-verify             0 4 1 1 *        [wd]     scheduler dependency canary
+token-spend-watch                  */15 * * * *     [wd]     per-turn token ledger over threshold
+daily-ai-spend-digest              daily 9am        [auto]   AI spend digest for the team
+model-policy-drift-check           0 9 * * *        [wd]     every job on its policy model family; re-pin and report
+openrouter-credit-floor            every 30m        [wd]     model-provider credits before they run out
+weekly-cron-noise-review           monday 9am       [auto]   fleet noise review: silence what nobody reads
+chat-gateway-pool-watchdog         every 2m         [wd]     gateway send-pool health, auto-restart
+sentry-proxy-watchdog              every 5m         [wd]     error-tracker proxy liveness
+antiwork-org-interaction-rearm     monday 9am       [wd]     org interaction limit re-armed if it lapsed
+
+# ── COMMS ────────────────────────────────────────────────────────────────────
+gemini-meet-notes-watcher          every 60m        [auto]   meeting notes → actions, with assignee rules
+meeting-reminders-1-1              every 5m         [auto]   one-to-one meeting reminders
+office-restock-reminder            thursday 9am     [auto]   remind the team of the weekly office restock
+office-restock-order               friday 10am      [gated]  place the weekly office restock order
+bigtech-wait-watch                 0 */8 * * *      [auto]   open waits on large third-party vendors
+
+# ⟨redacted⟩ — ~63 case-scoped follow-ups omitted (one open ticket or PR each; they retire with it).
 #     Delivery targets, prompts, and model routing removed for public showcase.
